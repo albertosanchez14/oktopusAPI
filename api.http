@@ -1,0 +1,11 @@
+
+
+# Check if the server is running
+GET http://localhost:8000/auth/google
+
+POST http://localhost:5000/files/temp
+Content-Type: application/json
+{
+  user: "test_user"
+  file: "hash_md5"
+}

@@ -1,95 +1,78 @@
-/* 
-Google Drive API:
-Demonstration to:
-1. upload 
-2. delete 
-3. create public URL of a file.
-required npm package: googleapis
-*/
-import { google } from 'googleapis';
-import dotenv from 'dotenv';
-import express from 'express';
-const fs = require('fs');
+// APP
+const { google } = require("googleapis");
+const fs = require("fs");
+const { listFiles, authorize } = require("./drive");
+
+const express = require("express");
+const app = express();
+
+const dotenv = require("dotenv");
+dotenv.config();
+
+let index;
+
+let oauth2Clients = [];
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
   process.env.REDIRECT_URI
 );
+const oauth2Client2 = new google.auth.OAuth2(
+  process.env.CLIENT_ID,
+  process.env.CLIENT_SECRET,
+  process.env.REDIRECT_URI
+);
 
-const PORT = process.env.PORT || 3000;
+try {
+  const creds = fs.readFileSync("credentials/credentials.json");
+  oauth2Client.setCredentials(JSON.parse(creds));
+  oauth2Client2.setCredentials(JSON.parse(creds));
+} catch (err) {
+  console.log(err);
+}
 
-oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
-
-const drive = google.drive({
-  version: 'v3',
-  auth: oauth2Client,
+app.get("/auth/google/:id", async (req, res) => {
+  // const client = await authorize();
+  const url = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    scope: ["https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/drive"],
+  });
+  index = req.params.id;
+  res.redirect(url);
 });
 
-/* 
-filepath which needs to be uploaded
-Note: Assumes example.jpg file is in root directory, 
-though this can be any filePath
-*/
-const filePath = path.join(__dirname, 'IMG_7473.jpg');
+app.get("/google/redirect", async (req, res) => {
+  // TODO: Refactor this to use a single function
+  if (index == 1) {
+    console.log("Redirected from Google");
+    const { code } = req.query;
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+    fs.writeFileSync("credentials/token.json", JSON.stringify(tokens));
+  } else {
+    console.log("Redirected from Google2");
+    const { code } = req.query;
+    const { tokens } = await oauth2Client2.getToken(code);
+    oauth2Client2.setCredentials(tokens);
+    fs.writeFileSync("credentials/token2.json", JSON.stringify(tokens));
+  }  
+  res.send("You are now authenticated with Google");
+});
 
-async function uploadFile() {
-  try {
-    const response = await drive.files.create({
-      requestBody: {
-        name: 'IMG_7473.jpg', //This can be name of your choice
-        mimeType: 'image/jpg',
-      },
-      media: {
-        mimeType: 'image/jpg',
-        body: fs.createReadStream(filePath),
-      },
-    });
+app.get("/list", async (req, res) => {
+  const file_list = await listFiles(oauth2Client);
+  const file_list2 = await listFiles(oauth2Client2);
+  res.send("Files1: " + file_list + "Files2: " + file_list2);
+});
 
-    console.log(response.data);
-  } catch (error) {
-    console.log(error.message);
-  }
-}
+app.get("/retrieve/:fileid", (req, res) => {
+  const fileId = req.params.fileid;
+  
+  res.send("File ID: " + fileId);
+});
 
-uploadFile();
-
-async function deleteFile() {
-  try {
-    const response = await drive.files.delete({
-      fileId: 'YOUR FILE ID',
-    });
-    console.log(response.data, response.status);
-  } catch (error) {
-    console.log(error.message);
-  }
-}
-
-// deleteFile();
-
-async function generatePublicUrl() {
-  try {
-    const fileId = 'YOUR FILE ID';
-    await drive.permissions.create({
-      fileId: fileId,
-      requestBody: {
-        role: 'reader',
-        type: 'anyone',
-      },
-    });
-
-    /* 
-    webViewLink: View the file in browser
-    webContentLink: Direct download link 
-    */
-    const result = await drive.files.get({
-      fileId: fileId,
-      fields: 'webViewLink, webContentLink',
-    });
-    console.log(result.data);
-  } catch (error) {
-    console.log(error.message);
-  }
-}
-
-// generatePublicUrl();
+app.listen(8000, () => {
+  console.log("Server is running on port 8000");
+});

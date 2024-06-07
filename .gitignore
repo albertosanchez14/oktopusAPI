@@ -143,3 +143,4 @@ dist
 
 server.code-workspace
 credentials/*
+src/logs/*

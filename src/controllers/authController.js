@@ -1,6 +1,9 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const fs = require("fs");
+const { google } = require("googleapis");
+const { addAcount } = require("../middleware/OAuth2ClientManager");
 const asyncHandler = require("express-async-handler");
 
 // @desc Login
@@ -96,4 +99,48 @@ const logout = (req, res) => {
   res.json({ message: "Cookie cleared" });
 };
 
-module.exports = { login, refresh, logout };
+const oauth2Client = new google.auth.OAuth2(
+  process.env.CLIENT_ID,
+  process.env.CLIENT_SECRET,
+  process.env.REDIRECT_URI
+);
+// @desc Google OAuth login
+// @route GET /auth/google
+// @access Public
+const googleLogin = asyncHandler(async (req, res) => {
+  // Generate URL for Google OAuth
+  const url = oauth2Client.generateAuthUrl({
+    access_type: "offline",
+    scope: [
+      "https://www.googleapis.com/auth/userinfo.profile",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/drive",
+    ],
+  });
+  res.redirect(url);
+});
+
+// @desc Google OAuth redirect
+// @route GET /auth/google/redirect
+// @access Public
+const googleRedirect = asyncHandler(async (req, res) => {
+  // TODO: An error response e.g. error=access_denied
+  // TODO: Check state value
+  // Get code from query
+  const { code } = req.query;
+  // Get tokens from code
+  const { tokens } = await oauth2Client.getToken(code);
+  // Set credentials
+  oauth2Client.setCredentials(tokens);
+  // Add account to OAuth2ClientManager
+  addAcount(tokens);
+  res.json({ message: "You are now authenticated with Google" });
+});
+
+module.exports = {
+  login,
+  refresh,
+  logout,
+  googleLogin,
+  googleRedirect,
+};

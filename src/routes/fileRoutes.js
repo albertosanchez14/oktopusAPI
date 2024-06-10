@@ -3,7 +3,7 @@ const router = express.Router();
 const fileController = require("../controllers/fileController");
 const verifyJWT = require("../middleware/verifyJWT");
 
-router.use(verifyJWT);
+// router.use(verifyJWT);
 
 router.route("/")
     .get(fileController.getAllFiles)

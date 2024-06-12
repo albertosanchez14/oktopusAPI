@@ -23,7 +23,6 @@ const getAllFiles = asyncHandler(async (req, res) => {
 // @route POST /files
 // @access Private
 const uploadFile = asyncHandler(async (req, res) => {});
-const uploadFile = asyncHandler(async (req, res) => {});
 
 // @desc Delete a file
 // @route DELETE /files

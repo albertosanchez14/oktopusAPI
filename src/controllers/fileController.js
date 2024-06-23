@@ -1,9 +1,10 @@
 const File = require("../models/File");
 const asyncHandler = require("express-async-handler");
+const fs = require("fs");
 
 const { google } = require("googleapis");
 const { OAuth2Clients } = require("../middleware/OAuth2ClientManager");
-const { listHomeFiles, listFilesFolder } = require("./drive");
+const { listHomeFiles, listFilesFolder, getFilebyId } = require("./drive");
 const { response } = require("express");
 
 // @desc Get all files
@@ -22,7 +23,39 @@ const getAllFiles = asyncHandler(async (req, res) => {
 // @desc Upload new file
 // @route POST /files
 // @access Private
-const uploadFile = asyncHandler(async (req, res) => {});
+const uploadFile = asyncHandler(async (req, res) => {
+  // Get the file from the request
+
+  // Get one of the clients
+  const client =
+    OAuth2Clients[Math.floor(Math.random() * OAuth2Clients.length)];
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.CLIENT_SECRET,
+    process.env.REDIRECT_URI
+  );
+  oauth2Client.setCredentials(client["tokens"]);
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  // Upload the file
+  const requestBody = {
+    name: "cat_blue.png",
+    fields: "id",
+  };
+  const media = {
+    mimeType: "image/png",
+    body: fs.createReadStream("files/cat_blue.png"),
+  };
+  try {
+    const file = await drive.files.create({
+      requestBody,
+      media: media,
+    });
+    console.log("File Id:", file.data.id);
+    res.json({ message: "File uploaded", file: file.data });
+  } catch (error) {
+    console.error(error);
+  }
+});
 
 // @desc Delete a file
 // @route DELETE /files
@@ -46,11 +79,10 @@ const getFolderFiles = asyncHandler(async (req, res) => {
     const drive = google.drive({ version: "v3", auth: oauth2Client });
     try {
       const res = await drive.files.list({
-        fields:
-          "nextPageToken, files(id, name, owners)",
+        fields: "nextPageToken, files(id, name, owners)",
         q: `'${folderId}' in parents`,
       });
-      // 
+      //
       const folderFiles = await listFilesFolder(client["tokens"], folderId);
       folderFiles.map((file) => files.push(file));
       //
@@ -61,4 +93,15 @@ const getFolderFiles = asyncHandler(async (req, res) => {
   res.json({ message: `Files from folder: ${folderId}`, files: files });
 });
 
-module.exports = { getAllFiles, uploadFile, deleteFile, getFolderFiles };
+// @desc Get file by id
+// @route GET /files/:fileId
+// @access Private
+const getFile = asyncHandler(async (req, res) => {});
+
+module.exports = {
+  getAllFiles,
+  uploadFile,
+  deleteFile,
+  getFolderFiles,
+  getFile,
+};

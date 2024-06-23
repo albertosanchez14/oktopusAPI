@@ -1,3 +1,4 @@
+const fs = require("fs");
 const { google } = require("googleapis");
 
 /**
@@ -74,4 +75,36 @@ async function listFilesFolder(tokens, folderId) {
   }
 }
 
-module.exports = { listHomeFiles, listFilesFolder };
+async function getFilebyId(tokens, fileId) {
+  // Create an OAuth2 client
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.CLIENT_SECRET,
+    process.env.REDIRECT_URI
+  );
+  oauth2Client.setCredentials(tokens);
+  // Create a drive client
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  // Get file
+  try {
+    const res = await drive.files.get(
+      { fileId: fileId, alt: "media" },
+      { responseType: "stream" }
+    );
+    console.log(res.data.name);
+    const dest = fs.createWriteStream(`${res.data.name}`);
+    const data = res.data;
+    data
+      .on("end", () => console.log("Done."))
+      .on("error", (err) => {
+        console.log(err);
+        return process.exit();
+      })
+      .pipe(dest);
+    return data;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+module.exports = { listHomeFiles, listFilesFolder, getFilebyId };

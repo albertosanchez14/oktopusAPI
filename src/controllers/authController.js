@@ -124,16 +124,49 @@ const googleLogin = asyncHandler(async (req, res) => {
 // @route GET /auth/google/redirect
 // @access Public
 const googleRedirect = asyncHandler(async (req, res) => {
-  // TODO: An error response e.g. error=access_denied
-  // TODO: Check state value
   // Get code from query
   const { code } = req.query;
   // Get tokens from code
   const { tokens } = await oauth2Client.getToken(code);
   // Set credentials
   oauth2Client.setCredentials(tokens);
+  // Get user info
+  const oauth2 = google.oauth2({ version: "v3", auth: oauth2Client });
+  const userInfo = await oauth2.userinfo.get();
+  
+  // Get refresh token from cookie
+  const cookies = req.cookies;
+  if (!cookies?.jwt) return res.status(401).json({ message: "Unauthorized" });
+  const refreshToken = cookies.jwt;
+  // Verify refresh token
+  jwt.verify(
+    refreshToken,
+    process.env.REFRESH_TOKEN_SECRET,
+    asyncHandler(async (err, decoded) => {
+      // If invalid, return 403 Forbidden
+      if (err) return res.status(403).json({ message: "Forbidden" });
+      // Find user in MongoDB
+      const foundUser = await User.findOne({
+        username: decoded.username,
+      }).exec();
+      if (!foundUser) return res.status(401).json({ message: "Unauthorized" });
+      // Save tokens to user
+      const savedTokens = { username: userInfo.name, email: email, ...tokens };
+      try {
+        foundUser.tokens.push(savedTokens);
+        await foundUser.save();
+      }
+      catch (error) {
+        console.error(error);
+        return res.status(400).json({ message: "Error saving tokens" });
+      }
+    })
+  );
+  
   // Add account to OAuth2ClientManager
+  // TODO: delete this in final implementation
   addAcount(tokens);
+  //
   res.json({ message: "You are now authenticated with Google" });
 });
 

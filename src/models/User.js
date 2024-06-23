@@ -8,6 +8,7 @@ const tokenSchema = new mongoose.Schema({
     email: {
         type: String,
         required: true,
+        unique: true,
     },    
     access_token: {
         type: String,
@@ -29,8 +30,8 @@ const tokenSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    expiracy_date: {
-        type: Date,
+    expiry_date: {
+        type: Number,
         required: true,
     }
 });
@@ -52,7 +53,7 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
     },
-    googleTokens: {
+    google_tokens: {
         type: [tokenSchema],
         default: [],
         required: false

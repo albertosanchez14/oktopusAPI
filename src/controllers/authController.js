@@ -134,7 +134,7 @@ const googleRedirect = asyncHandler(async (req, res) => {
   // TODO: change to v3 in final implementation
   const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
   const userInfo = await oauth2.userinfo.get();
-  
+
   // Get refresh token from cookie
   const cookies = req.cookies;
   if (!cookies?.jwt) return res.status(401).json({ message: "Unauthorized" });
@@ -152,24 +152,40 @@ const googleRedirect = asyncHandler(async (req, res) => {
       }).exec();
       if (!foundUser) return res.status(401).json({ message: "Unauthorized" });
       // Save tokens to user
-      const savedTokens = { username: userInfo.name, email: email, ...tokens };
+      const savedTokens = {
+        username: userInfo.data.name,
+        email: userInfo.data.email,
+        ...tokens,
+      };
       try {
-        foundUser.tokens.push(savedTokens);
+        // Check if account is already linked
+        const tokenExists = foundUser.google_tokens.find(
+          (tokens) => tokens.email === savedTokens.email
+        );
+        if (tokenExists) { 
+          // TODO: this is not working
+          foundUser.google_tokens.replace(tokenExists, savedTokens);
+          return res.json({ message: "Account already linked" });
+        }
+        // Save tokens
+        foundUser.google_tokens.push(savedTokens);
         await foundUser.save();
-      }
-      catch (error) {
+        res.json({ message: "You are now authenticated with Google" });
+      } catch (error) {
         console.error(error);
         return res.status(400).json({ message: "Error saving tokens" });
       }
     })
   );
-  
+
   // Add account to OAuth2ClientManager
   // TODO: delete this in final implementation
   addAcount(tokens);
-  fs.writeFileSync(`credentials/${userInfo.name}_tokens.json`, JSON.stringify(tokens));
+  fs.writeFileSync(
+    `credentials/${userInfo.name}_tokens.json`,
+    JSON.stringify(tokens)
+  );
   //
-  res.json({ message: "You are now authenticated with Google" });
 });
 
 module.exports = {

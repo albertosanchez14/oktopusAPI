@@ -131,7 +131,8 @@ const googleRedirect = asyncHandler(async (req, res) => {
   // Set credentials
   oauth2Client.setCredentials(tokens);
   // Get user info
-  const oauth2 = google.oauth2({ version: "v3", auth: oauth2Client });
+  // TODO: change to v3 in final implementation
+  const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
   const userInfo = await oauth2.userinfo.get();
   
   // Get refresh token from cookie
@@ -166,6 +167,7 @@ const googleRedirect = asyncHandler(async (req, res) => {
   // Add account to OAuth2ClientManager
   // TODO: delete this in final implementation
   addAcount(tokens);
+  fs.writeFileSync(`credentials/${userInfo.name}_tokens.json`, JSON.stringify(tokens));
   //
   res.json({ message: "You are now authenticated with Google" });
 });

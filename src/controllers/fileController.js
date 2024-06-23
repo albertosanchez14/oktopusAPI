@@ -1,11 +1,11 @@
 const File = require("../models/File");
+const User = require("../models/User");
 const asyncHandler = require("express-async-handler");
 const fs = require("fs");
 
 const { google } = require("googleapis");
 const { OAuth2Clients } = require("../middleware/OAuth2ClientManager");
 const { listHomeFiles, listFilesFolder, getFilebyId } = require("./drive");
-const { response } = require("express");
 
 // @desc Get all files
 // @route GET /files
@@ -67,6 +67,15 @@ const deleteFile = asyncHandler(async (req, res) => {});
 // @access Private
 const getFolderFiles = asyncHandler(async (req, res) => {
   const folderId = req.params.folderId;
+  const username = req.username;
+  const email = req.email;
+  // Find user in MongoDB
+  const foundUser = await User.findOne({ username }).exec();
+  if (!foundUser) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  
+
   const files = new Array();
   for (const client of OAuth2Clients) {
     // Get the files from the google account

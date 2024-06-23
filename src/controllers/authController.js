@@ -155,22 +155,25 @@ const googleRedirect = asyncHandler(async (req, res) => {
       const savedTokens = {
         username: userInfo.data.name,
         email: userInfo.data.email,
-        ...tokens,
+        tokens,
       };
       try {
         // Check if account is already linked
-        const tokenExists = foundUser.google_tokens.find(
-          (tokens) => tokens.email === savedTokens.email
+        const tokenExists = foundUser.google_credentials.find(
+          (google) => google.email === savedTokens.email
         );
-        if (tokenExists) { 
-          // TODO: this is not working
-          foundUser.google_tokens.replace(tokenExists, savedTokens);
-          return res.json({ message: "Account already linked" });
+        if (tokenExists) {
+          // Update tokens
+          const index = foundUser.google_credentials.indexOf(tokenExists);
+          foundUser.google_credentials[index] = savedTokens;
+          await foundUser.save();
+          res.json({ message: "Account already linked" });
+        } else {
+          // Save tokens
+          foundUser.google_credentials.push(savedTokens);
+          await foundUser.save();
+          res.json({ message: "You are now authenticated with Google" });
         }
-        // Save tokens
-        foundUser.google_tokens.push(savedTokens);
-        await foundUser.save();
-        res.json({ message: "You are now authenticated with Google" });
       } catch (error) {
         console.error(error);
         return res.status(400).json({ message: "Error saving tokens" });
@@ -180,9 +183,8 @@ const googleRedirect = asyncHandler(async (req, res) => {
 
   // Add account to OAuth2ClientManager
   // TODO: delete this in final implementation
-  addAcount(tokens);
   fs.writeFileSync(
-    `credentials/${userInfo.name}_tokens.json`,
+    `credentials/${userInfo.data.name}_tokens.json`,
     JSON.stringify(tokens)
   );
   //

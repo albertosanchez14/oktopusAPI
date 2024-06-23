@@ -38,7 +38,6 @@ async function addAcount(tokens) {
     const { data } = await oauth2.userinfo.get(); // get user info
     const email = data.email;
     if (email === email_new) {
-      console.log("Account already added");
       return;
     }
   }

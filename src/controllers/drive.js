@@ -22,7 +22,7 @@ async function listHomeFiles(tokens) {
   try {
     const res = await drive.files.list({
       fields:
-        "nextPageToken, files(id, name, parents, kind, fileExtension, size, properties)",
+        "nextPageToken, files(id, name, parents, kind, mimeType, fileExtension, size, properties, owners)",
       q: "'root' in parents",
     });
     const files = res.data.files;

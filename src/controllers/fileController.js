@@ -1,9 +1,10 @@
 const User = require("../models/User");
 const asyncHandler = require("express-async-handler");
 const fs = require("fs");
+const multer = require("multer");
+const crypto = require("crypto");
 
-const { google } = require("googleapis");
-const { listFilesFolder, getFilebyId } = require("./drive");
+const { listFilesFolder, getFilebyId, uploadFiletoDrive } = require("./drive");
 
 // @desc Get all files
 // @route GET /files
@@ -34,41 +35,71 @@ const getAllFiles = asyncHandler(async (req, res) => {
   res.json({ message: "Files from home", files: files });
 });
 
+// Set storage engine
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, "uploads/");
+  },
+  filename: function (req, file, cb) {
+    cb(null, `file-${crypto.randomUUID()}.png`);
+  },
+});
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 10000000 }, //10MB
+});
+
 // @desc Upload new file
-// @route POST /files
+// @route POST /files or /folders/:folderId/:fileId
 // @access Private
 const uploadFile = asyncHandler(async (req, res) => {
-  // Get the file from the request
-
-  // Get one of the clients
-  const client =
-    OAuth2Clients[Math.floor(Math.random() * OAuth2Clients.length)];
-  const oauth2Client = new google.auth.OAuth2(
-    process.env.CLIENT_ID,
-    process.env.CLIENT_SECRET,
-    process.env.REDIRECT_URI
-  );
-  oauth2Client.setCredentials(client["tokens"]);
-  const drive = google.drive({ version: "v3", auth: oauth2Client });
-  // Upload the file
-  const requestBody = {
-    name: "cat_blue.png",
-    fields: "id",
-  };
-  const media = {
-    mimeType: "image/png",
-    body: fs.createReadStream("files/cat_blue.png"),
-  };
-  try {
-    const file = await drive.files.create({
-      requestBody,
-      media: media,
-    });
-    console.log("File Id:", file.data.id);
-    res.json({ message: "File uploaded", file: file.data });
-  } catch (error) {
-    console.error(error);
-  }
+  upload.any()(req, res, async function (err) {
+    if (err) {
+      return res.status(400).json({ message: "Error uploading file" });
+    }
+    const folderId = req.params.folderId;
+    const username = req.username;
+    const email = req.email;
+    // Find user in MongoDB
+    const foundUser = await User.findOne({
+      username: username,
+      email: email,
+    })
+      .lean()
+      .exec();
+    if (!foundUser) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    // Get the google credentials
+    const credentials = foundUser.google_credentials;
+    if (!credentials) {
+      return res.status(400).json({ message: "No google credentials" });
+    }
+    // Upload the file to the google accounts with space
+    let index = 0;
+    const googleFiles = [];
+    while (index < credentials.length) {
+      const googleCred = credentials[index];
+      const files = req.files;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const data = await uploadFiletoDrive(googleCred.tokens, file, folderId);
+        if (data === undefined) {
+          // Error when uploading, trying next account
+          index++;
+          break;
+        } else {
+          // File uploaded successfully
+          googleFiles.push(data);
+          fs.unlinkSync(file.path); // Delete the uploaded file
+          files.splice(i, 1); // Remove the uploaded file from the array
+          i--; // Adjust index after removing the item
+        }
+      }
+      index = files.length === 0 ? credentials.length : 0;
+    }
+    res.json({ message: "Files uploaded", files: googleFiles });
+  });
 });
 
 // @desc Delete a file
@@ -80,6 +111,7 @@ const deleteFile = asyncHandler(async (req, res) => {});
 // @route GET /files/folders/:folderId
 // @access Private
 const getFolderFiles = asyncHandler(async (req, res) => {
+  const folderId = req.params.folderId;
   const username = req.username;
   const email = req.email;
   // Find user in MongoDB
@@ -100,14 +132,14 @@ const getFolderFiles = asyncHandler(async (req, res) => {
   // Get all files from the google accounts
   const files = new Array();
   for (const googleCred of credentials) {
-    const folderFiles = await listFilesFolder(googleCred.tokens, "root");
+    const folderFiles = await listFilesFolder(googleCred.tokens, folderId);
     folderFiles.map((file) => files.push(file));
   }
   res.json({ message: `Files from folder: ${folderId}`, files: files });
 });
 
 // @desc Get file by id
-// @route GET /files/:fileId
+// @route GET /files/:fileId or /files/folders/:folderId/:fileId
 // @access Private
 const getFile = asyncHandler(async (req, res) => {
   const username = req.username;

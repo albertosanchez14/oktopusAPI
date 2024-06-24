@@ -185,14 +185,6 @@ const googleRedirect = asyncHandler(async (req, res) => {
       }
     })
   );
-
-  // Add account to OAuth2ClientManager
-  // TODO: delete this in final implementation
-  fs.writeFileSync(
-    `credentials/${userInfo.data.name}_tokens.json`,
-    JSON.stringify(tokens)
-  );
-  //
 });
 
 module.exports = {

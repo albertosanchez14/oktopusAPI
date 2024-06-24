@@ -1,3 +1,5 @@
+const fs = require("fs");
+
 const { google } = require("googleapis");
 
 /**
@@ -21,7 +23,7 @@ async function listFilesFolder(tokens, folderId) {
     const res = await drive.files.list({
       fields:
         "nextPageToken, files(id, name, parents, kind, mimeType, fileExtension, size, properties, owners)",
-      q: `'${folderId}' in parents`,
+      q: `'${folderId}' in parents and trashed = false`,
     });
     const files = res.data.files;
     console.log(files);
@@ -58,4 +60,37 @@ async function getFilebyId(tokens, fileId) {
   }
 }
 
-module.exports = { listFilesFolder, getFilebyId };
+async function uploadFiletoDrive(tokens, file, folderId) {
+  // Create an OAuth2 client
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.CLIENT_SECRET,
+    process.env.REDIRECT_URI
+  );
+  oauth2Client.setCredentials(tokens);
+  // Create a drive client
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  // Upload the file
+  const parent = folderId === undefined ? "root" : folderId;
+  const requestBody = {
+    name: file.originalname,
+    fields: "id",
+    parents: [parent],
+  };
+  const media = {
+    mimeType: file.mimetype,
+    body: fs.createReadStream(file.path),
+  };
+  try {
+    const res = await drive.files.create({
+      requestBody,
+      media: media,
+    });
+    return res.data;
+  } catch (error) {
+    console.error(error);
+    return undefined;
+  }
+}
+
+module.exports = { listFilesFolder, getFilebyId, uploadFiletoDrive };

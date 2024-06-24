@@ -7,14 +7,17 @@ router.use(verifyJWT);
 
 router.route([ "/", "/home", "/folders"])
     .get(fileController.getAllFiles)
-    .post(fileController.uploadFile)
     .delete(fileController.deleteFile);
 
 router.route("/folders/:folderId")
-    .get(fileController.getFolderFiles);
+    .get(fileController.getFolderFiles)
+
+router.route("/folders/:folderId/:fileId")
+    .get(fileController.getFile)
+    .post(fileController.uploadFile);
 
 router.route("/:fileId")
     .get(fileController.getFile)
-    .post(fileController.uploadFile);
+    .post(fileController.uploadFile); 
 
 module.exports = router;

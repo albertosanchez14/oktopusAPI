@@ -30,13 +30,18 @@ const login = asyncHandler(async (req, res) => {
     {
       UserInfo: {
         username: foundUser.username,
+        email: foundUser.email,
       },
     },
     process.env.ACCESS_TOKEN_SECRET,
-    { expiresIn: "15m" }
+    // TODO:Change to 15m in final implementation
+    { expiresIn: "7d" }
   );
   const refreshToken = jwt.sign(
-    { username: foundUser.username },
+    { 
+      username: foundUser.username,
+      email: foundUser.email,
+    },
     process.env.REFRESH_TOKEN_SECRET,
     { expiresIn: "7d" }
   );

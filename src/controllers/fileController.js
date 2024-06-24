@@ -11,11 +11,26 @@ const { listHomeFiles, listFilesFolder, getFilebyId } = require("./drive");
 // @route GET /files
 // @access Private
 const getAllFiles = asyncHandler(async (req, res) => {
-  // TODO: Check if the token is valid
+  console.log("Get all files");
+  const username = req.username;
+  const email = req.email;
+  console.log(username, email);
+  // Find user in MongoDB
+  const foundUser = await User.findOne({
+    email: email,
+  }).lean().exec();
+  if (!foundUser) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  // Get all files from the google accounts
   const files = new Array();
-  for (client of OAuth2Clients) {
-    const homeFiles = await listHomeFiles(client["tokens"]);
-    homeFiles.map((file) => files.push(file));
+  const credentials = foundUser.google_credentials;
+  if (!credentials) {
+    return res.status(400).json({ message: "No google credentials" });
+  }
+  for (const googleCred of credentials) {
+    const folderFiles = await listHomeFiles(googleCred.tokens);
+    folderFiles.map((file) => files.push(file));
   }
   res.json({ message: "Files from home", files: files });
 });

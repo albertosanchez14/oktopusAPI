@@ -4,11 +4,19 @@ const { google } = require("googleapis");
 /**
  * Lists the names and IDs of all files in the user's homepage Google Drive.
  * @param {{ access_token, refresh_token, scope,
- * token_type, id_token, expiracy_date}} tokens Client tokens.
+ * token_type, id_token, expiry_data}} googleTokens Client tokens.
  * @returns { Array<{ kind, fileExtension, mimeType, parents, owners,
  * size, id, name}> || undefined } An array of file metadata objects.
  */
 async function listHomeFiles(tokens) {
+  const googleTokens = {
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    scope: tokens.scope,
+    token_type: tokens.token_type,
+    id_token: tokens.id_token,
+    expiry_date: tokens.expiry_date,
+  };
   // Create an OAuth2 client
   const oauth2Client = new google.auth.OAuth2(
     process.env.CLIENT_ID,

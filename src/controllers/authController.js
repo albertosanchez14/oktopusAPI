@@ -2,9 +2,9 @@ const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
-const { google } = require("googleapis");
-const { addAcount } = require("../middleware/OAuth2ClientManager");
 const asyncHandler = require("express-async-handler");
+
+const { google } = require("googleapis");
 
 // @desc Login
 // @route POST /auth
@@ -38,7 +38,7 @@ const login = asyncHandler(async (req, res) => {
     { expiresIn: "7d" }
   );
   const refreshToken = jwt.sign(
-    { 
+    {
       username: foundUser.username,
       email: foundUser.email,
     },

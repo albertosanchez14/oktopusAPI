@@ -4,6 +4,7 @@ const {
   listFilesFolder,
   uploadFiletoDrive,
   getFilebyId,
+  deleteFilebyId
 } = require("./driveService");
 
 const User = require("../models/User");
@@ -130,4 +131,41 @@ async function handleDownload(username, email, fileId, owners_email) {
   return { message: "File downloaded", data: results[0] };
 }
 
-module.exports = { handleListFolderFiles, handleUpload, handleDownload };
+/**
+ * Handles the deletion of a file from the user's google drive accounts.
+ * @param {String} username The username of the user.
+ * @param {String} email The email of the user.
+ * @param {String} fileId The file ID to delete.
+ * @returns { message } An object containing a message.
+ * @throws { Error } If the user is unauthorized, has no google credentials, or
+ * if the file deletion fails.
+ */
+async function handleDelete(username, email, fileId, owners_email) {
+  // Find user in database
+  const foundUser = await User.findOne({
+    username: username,
+    email: email,
+  })
+    .lean()
+    .exec();
+  if (!foundUser) return { message: "Unauthorized" };
+  // From the file owners email, find the google credentials that match
+  await Promise.all(
+    owners_email.map(async (ownerEmail) => {
+      const googleCred = foundUser.google_credentials.find(
+        (cred) => cred.email === ownerEmail
+      );
+      if (googleCred) {
+        await deleteFilebyId(googleCred.tokens, fileId);
+      }
+    })
+  );
+  return { message: "File deleted" };
+}
+
+module.exports = {
+  handleListFolderFiles,
+  handleUpload,
+  handleDownload,
+  handleDelete,
+};

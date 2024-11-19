@@ -4,6 +4,7 @@ const {
   handleListFolderFiles,
   handleUpload,
   handleDownload,
+  handleDelete,
 } = require("../services/fileService");
 
 /**
@@ -48,11 +49,6 @@ const uploadFile = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc Delete a file
-// @route DELETE /files
-// @access Private
-const deleteFile = asyncHandler(async (req, res) => {});
-
 /**
  * @desc Gets a file datastream by its ID
  * @route GET /files/:fileId or /files/folders/:folderId/:fileId
@@ -63,15 +59,44 @@ const downloadFile = asyncHandler(async (req, res) => {
   const email = req.email;
   // Get the file from the google account
   const fileId = req.params.fileId;
-  if (fileId !== req.body.id) {
+  if (fileId !== req.body.id)
     return res.status(400).json({ message: "File id mismatch" });
-  }
   const owners_email = req.body.owners.map((owner) => owner.emailAddress);
   // Get the file datastream
   const data = await handleDownload(username, email, fileId, owners_email);
   if (data.message === "Unauthorized")
     return res.status(401).json({ message: "Unauthorized" });
   return res.status(200).json({ message: "File retrieved", data: data });
+});
+
+/**
+ * @desc Deletes a file from the user's homepage drive account
+ * @route DELETE /files/:fileId
+ * @access Private
+ */
+const deleteFile = asyncHandler(async (req, res) => {
+  const username = req.username;
+  const email = req.email;
+  // Get the file from the google account
+  let fileId = req.params.fileId; 
+  // If file id is empty take folder id
+  if (req.params.fileId === undefined && req.params.folderId !== undefined) 
+    fileId = req.params.folderId;
+
+  if (fileId !== req.body.id)
+    return res.status(400).json({ message: "File id mismatch" });
+  const owners_email = req.body.owners.map((owner) => owner.emailAddress);
+  // Delete the file from the google account
+  const data = await handleDelete(username, email, fileId, owners_email);
+  if (data.message === "Unauthorized")
+    return res.status(401).json({ message: "Unauthorized" });
+  if (data.message === "File not found")
+    return res.status(404).json({ message: "File not found" });
+  if (data.message === "Failed to delete file")
+    return res.status(400).json({ message: "Failed to delete file" });
+  if (data.message === "File deleted")
+    return res.status(200).json({ message: "File deleted" });
+  return res.status(500).json({ message: "Internal Server Error" });
 });
 
 module.exports = {

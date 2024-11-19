@@ -10,7 +10,8 @@ const router = express.Router();
 router.use(verifyJWT);
 
 router.route(["/", "/home", "/folders"])
-    .get(fileController.listFolderFiles);
+    .get(fileController.listFolderFiles)
+    .post(upload.any(), fileController.uploadFile);
 
 router.route("/:fileId")
   .get(fileController.downloadFile)
@@ -19,11 +20,11 @@ router.route("/:fileId")
 router
   .route("/folders/:folderId")
   .get(fileController.listFolderFiles)
-  .post(upload.any(), fileController.uploadFile);
+  .post(upload.any(), fileController.uploadFile)
+  .delete(fileController.deleteFile);
 
 router
   .route("/folders/:folderId/:fileId")
-  .get(fileController.downloadFile)
-  .delete(fileController.deleteFile);
+  .get(fileController.downloadFile);
 
 module.exports = router;

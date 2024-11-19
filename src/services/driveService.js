@@ -107,4 +107,34 @@ async function uploadFiletoDrive(tokens, file, folderId) {
   }
 }
 
-module.exports = { listFilesFolder, getFilebyId, uploadFiletoDrive };
+/**
+ * Deletes a file from the user's google drive account.
+ * @param googleTokens Client tokens.
+ * @param fileId The file ID to delete.
+ * @returns undefined - If the file is deleted.
+ * @throws { Error } If the file cannot be deleted.
+ */
+async function deleteFilebyId(tokens, fileId) {
+  // Create an OAuth2 client
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.CLIENT_ID,
+    process.env.CLIENT_SECRET,
+    process.env.REDIRECT_URI
+  );
+  oauth2Client.setCredentials(tokens);
+  // Create a drive client
+  const drive = google.drive({ version: "v3", auth: oauth2Client });
+  // Delete file
+  try {
+    await drive.files.delete({ fileId: fileId });
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+module.exports = {
+  listFilesFolder,
+  getFilebyId,
+  uploadFiletoDrive,
+  deleteFilebyId,
+};

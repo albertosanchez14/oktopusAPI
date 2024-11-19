@@ -1,14 +1,17 @@
-const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const fs = require("fs");
 const asyncHandler = require("express-async-handler");
+
+const User = require("../models/User");
+const { createTokens } = require("../services/authService");
 
 const { google } = require("googleapis");
 
-// @desc Login
-// @route POST /auth
-// @access Public
+/**
+ * @desc Login
+ * @route POST /auth
+ * @access Public
+ */
 const login = asyncHandler(async (req, res) => {
   // Get username and password from request body
   const { username, password } = req.body;
@@ -24,27 +27,8 @@ const login = asyncHandler(async (req, res) => {
   // Compare password
   const match = await bcrypt.compare(password, foundUser.password);
   if (!match) return res.status(401).json({ message: "Incorrect password" });
-
   // Create tokens
-  const accessToken = jwt.sign(
-    {
-      UserInfo: {
-        username: foundUser.username,
-        email: foundUser.email,
-      },
-    },
-    process.env.ACCESS_TOKEN_SECRET,
-    // TODO:Change to 15m in final implementation
-    { expiresIn: "7d" }
-  );
-  const refreshToken = jwt.sign(
-    {
-      username: foundUser.username,
-      email: foundUser.email,
-    },
-    process.env.REFRESH_TOKEN_SECRET,
-    { expiresIn: "7d" }
-  );
+  const { accessToken, refreshToken } = await createTokens(foundUser);
   // Create secure cookie with refresh token
   res.cookie("jwt", refreshToken, {
     httpOnly: true, //accessible only by web server
@@ -172,12 +156,12 @@ const googleRedirect = asyncHandler(async (req, res) => {
           const index = foundUser.google_credentials.indexOf(tokenExists);
           foundUser.google_credentials[index] = savedTokens;
           await foundUser.save();
-          res.redirect("http://localhost:5173/login")
+          res.redirect("http://localhost:5173/login");
         } else {
           // Save tokens
           foundUser.google_credentials.push(savedTokens);
           await foundUser.save();
-          res.redirect("http://localhost:5173/login")
+          res.redirect("http://localhost:5173/login");
         }
       } catch (error) {
         console.error(error);

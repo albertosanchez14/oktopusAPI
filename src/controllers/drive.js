@@ -26,10 +26,9 @@ async function listFilesFolder(tokens, folderId) {
       q: `'${folderId}' in parents and trashed = false`,
     });
     const files = res.data.files;
-    console.log(files);
     if (files.length === 0) {
       console.log("No files found.");
-      return;
+      return files;
     }
     return files;
   } catch (error) {

@@ -111,6 +111,7 @@ const deleteFile = asyncHandler(async (req, res) => {});
 // @route GET /files/folders/:folderId
 // @access Private
 const getFolderFiles = asyncHandler(async (req, res) => {
+  console.log("Get folder files");
   const folderId = req.params.folderId;
   const username = req.username;
   const email = req.email;
@@ -142,6 +143,7 @@ const getFolderFiles = asyncHandler(async (req, res) => {
 // @route GET /files/:fileId or /files/folders/:folderId/:fileId
 // @access Private
 const getFile = asyncHandler(async (req, res) => {
+  console.log("Get file");
   const username = req.username;
   const email = req.email;
   // Find user in MongoDB

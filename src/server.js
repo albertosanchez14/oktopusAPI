@@ -3,9 +3,11 @@ const express = require("express");
 const path = require("path");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+
 const { corsOptions } = require("./config/corsOptions");
 const { logger, logEvents } = require("./middleware/logger");
 const { errorHandler } = require("./middleware/errorHandler");
+
 const connectDB = require("./config/dbConnect");
 const mongoose = require("mongoose");
 

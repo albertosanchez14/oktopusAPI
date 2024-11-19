@@ -1,4 +1,5 @@
 const { options } = require('../routes/root');
+
 const allowedOrigins = require('./allowedOrigins');
 
 const corsOptions = {

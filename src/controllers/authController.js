@@ -172,12 +172,12 @@ const googleRedirect = asyncHandler(async (req, res) => {
           const index = foundUser.google_credentials.indexOf(tokenExists);
           foundUser.google_credentials[index] = savedTokens;
           await foundUser.save();
-          res.json({ message: "Account already linked" });
+          res.redirect("http://localhost:5173/login")
         } else {
           // Save tokens
           foundUser.google_credentials.push(savedTokens);
           await foundUser.save();
-          res.json({ message: "You are now authenticated with Google" });
+          res.redirect("http://localhost:5173/login")
         }
       } catch (error) {
         console.error(error);

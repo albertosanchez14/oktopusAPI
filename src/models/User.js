@@ -61,7 +61,6 @@ const userSchema = new mongoose.Schema({
   },
   google_credentials: {
     type: [tokenSchema],
-    default: [],
     required: false,
   },
 });

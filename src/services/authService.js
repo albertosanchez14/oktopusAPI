@@ -1,5 +1,13 @@
 const jwt = require("jsonwebtoken");
 
+const User = require("../models/User");
+
+/**
+ * @desc Create access and refresh tokens
+ * @param {Object} user
+ * @returns {String} tokens.accessToken
+ * @returns {String} tokens.refreshToken
+ */
 async function createTokens(user) {
   const accessToken = jwt.sign(
     {
@@ -23,4 +31,37 @@ async function createTokens(user) {
   return { accessToken, refreshToken };
 }
 
-module.exports = { createTokens };
+/**
+ * @desc Refresh access token
+ * @param {String} refreshToken
+ * @returns {String} accessToken
+ */
+async function refreshAccessToken(refreshToken) {
+  return new Promise((resolve, reject) => {
+    jwt.verify(
+      refreshToken,
+      process.env.REFRESH_TOKEN_SECRET,
+      async (err, decoded) => {
+        if (err) return resolve("Forbidden");
+        // Find user in MongoDB
+        const foundUser = await User.findOne({
+          username: decoded.username,
+        }).exec();
+        if (!foundUser) return resolve("Unauthorized");
+        // Create new access token
+        const accessToken = jwt.sign(
+          {
+            UserInfo: {
+              username: foundUser.username,
+            },
+          },
+          process.env.ACCESS_TOKEN_SECRET,
+          { expiresIn: "15m" }
+        );
+        resolve(accessToken);
+      }
+    );
+  });
+}
+
+module.exports = { createTokens, refreshAccessToken };

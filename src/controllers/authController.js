@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const asyncHandler = require("express-async-handler");
 
 const User = require("../models/User");
-const { createTokens } = require("../services/authService");
+const { createTokens, refreshAccessToken } = require("../services/authService");
 
 const { google } = require("googleapis");
 
@@ -31,8 +31,8 @@ const login = asyncHandler(async (req, res) => {
   const { accessToken, refreshToken } = await createTokens(foundUser);
   // Create secure cookie with refresh token
   res.cookie("jwt", refreshToken, {
-    httpOnly: true, //accessible only by web server
-    secure: true, //https
+    httpOnly: false, //accessible only by web server
+    secure: false, //https
     sameSite: "None", //cross-site cookie
     maxAge: 7 * 24 * 60 * 60 * 1000, //cookie expiry: set to match rT
   });
@@ -40,41 +40,28 @@ const login = asyncHandler(async (req, res) => {
   res.json({ accessToken });
 });
 
-// @desc Refresh
-// @route GET /auth/refresh
-// @access Public - because access token has expired
-const refresh = (req, res) => {
+/**
+ * @desc Refresh
+ * @route GET /auth/refresh
+ * @access Public
+ */
+const refresh = asyncHandler(async (req, res) => {
   // Get refresh token from cookie
   const cookies = req.cookies;
   if (!cookies?.jwt) return res.status(401).json({ message: "Unauthorized" });
   const refreshToken = cookies.jwt;
-  // Verify refresh token
-  jwt.verify(
-    refreshToken,
-    process.env.REFRESH_TOKEN_SECRET,
-    asyncHandler(async (err, decoded) => {
-      // If invalid, return 403 Forbidden
-      if (err) return res.status(403).json({ message: "Forbidden" });
-      // Find user in MongoDB
-      const foundUser = await User.findOne({
-        username: decoded.username,
-      }).exec();
-      if (!foundUser) return res.status(401).json({ message: "Unauthorized" });
-      // Create new access token
-      const accessToken = jwt.sign(
-        {
-          UserInfo: {
-            username: foundUser.username,
-          },
-        },
-        process.env.ACCESS_TOKEN_SECRET,
-        { expiresIn: "15m" }
-      );
-      // Send new accessToken
-      res.json({ accessToken });
-    })
-  );
-};
+  // Get new access token
+  const accessToken = await refreshAccessToken(refreshToken);
+  // Check if token is valid
+  if (accessToken === "Forbidden") {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+  if (accessToken === "Unauthorized") {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  // Send new access token
+  res.json({ accessToken });
+});
 
 // @desc Logout
 // @route POST /auth/logout

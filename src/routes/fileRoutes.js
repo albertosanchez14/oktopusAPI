@@ -1,19 +1,19 @@
 const express = require("express");
 
 const fileController = require("../controllers/fileController");
+
 const { verifyJWT } = require("../middleware/verifyJWT");
-const { upload } = require("../config/storageOptions");
+const { upload } = require("../config/uploadOptions");
 
 const router = express.Router();
 
 router.use(verifyJWT);
 
 router.route([ "/", "/home", "/folders"])
-    .get(fileController.getAllFiles)
-    .delete(fileController.deleteFile);
+    .get(fileController.listFolderFiles)
 
 router.route("/folders/:folderId")
-    .get(fileController.getFolderFiles)
+    .get(fileController.listFolderFiles)
     .post(upload.any(), fileController.uploadFile);
 
 router.route("/folders/:folderId/:fileId")
@@ -21,5 +21,6 @@ router.route("/folders/:folderId/:fileId")
 
 router.route("/:fileId")
     .get(fileController.getFile)
+    .delete(fileController.deleteFile);
 
 module.exports = router;

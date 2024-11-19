@@ -1,8 +1,52 @@
 const fs = require("fs");
 
-const User = require("../models/User");
-const { uploadFiletoDrive } = require("./driveService");
+const { listFilesFolder, uploadFiletoDrive } = require("./driveService");
 
+const User = require("../models/User");
+
+/**
+ * Handles the retrieval of all files metadata in the user's homepage drive accounts.
+ * @param {String} username The username of the user.
+ * @param {String} email The email of the user.
+ * @param {String} folderId The folder ID to retrieve files from.
+ * @returns { message, files } An object containing a message and an array of files.
+ * @throws { Error } If the user is unauthorized or has no google credentials.
+ */
+async function handleListFolderFiles(username, email, folderId) {
+  // Find user in MongoDB
+  const foundUser = await User.findOne({
+    username: username,
+    email: email,
+  })
+    .lean()
+    .exec();
+  if (!foundUser) {
+    return { message: "Unauthorized" };
+  }
+  // Get all files from the google accounts
+  const credentials = foundUser.google_credentials;
+  if (!credentials) {
+    return { message: "No google credentials" };
+  }
+  const files = new Array();
+  for (const googleCred of credentials) {
+    const folderFiles = await listFilesFolder(googleCred.tokens, folderId);
+    folderFiles.map((file) => files.push(file));
+  }
+  return { message: "Files from home", files: files };
+}
+
+/**
+ * Handles the upload of files to the user's first google drive account
+ * with the specified folder ID.
+ * @param {String} username The username of the user.
+ * @param {String} email The email of the user.
+ * @param {Array} files The files to upload.
+ * @param {String} folderId The folder ID to upload the files to.
+ * @returns { message, files } An object containing a message and an array of files.
+ * @throws { Error } If the user is unauthorized, has no google credentials, or
+ * if the file upload fails.
+ */
 async function handleUpload(username, email, files, folderId) {
   // Validate user in MongoDB
   const foundUser = await User.findOne({ username, email }).lean().exec();
@@ -34,4 +78,4 @@ async function handleUpload(username, email, files, folderId) {
   return { message: "Files uploaded", files: googleFiles };
 }
 
-module.exports = { handleUpload };
+module.exports = { handleUpload, handleListFolderFiles };

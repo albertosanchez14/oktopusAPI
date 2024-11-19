@@ -1,43 +1,32 @@
 const asyncHandler = require("express-async-handler");
 const fs = require("fs");
 
-const { handleUpload } = require("../services/fileService");
 const {
-  listFilesFolder,
-  getFilebyId,
-} = require("../services/driveService");
+  handleListFolderFiles,
+  handleUpload,
+} = require("../services/fileService");
+const { listFilesFolder, getFilebyId } = require("../services/driveService");
 
 const User = require("../models/User");
 
-// @desc Get all files
-// @route GET /files
-// @access Private
-const getAllFiles = asyncHandler(async (req, res) => {
+/**
+ * @desc Gets all the metadata of the files in the user's homepage drive account
+ * @route GET /files or /files/home or /files/folders
+ * @access Private
+ */
+const listFolderFiles = asyncHandler(async (req, res) => {
   const username = req.username;
   const email = req.email;
-  // Find user in MongoDB
-  const foundUser = await User.findOne({
-    username: username,
-    email: email,
-  })
-    .lean()
-    .exec();
-  if (!foundUser) {
+  let folderId = req.params.folderId;
+  if (folderId === undefined) folderId = "root";
+  // Get all files from the user's homepage
+  const files = await handleListFolderFiles(username, email, folderId);
+  if (files.message === "Unauthorized")
     return res.status(401).json({ message: "Unauthorized" });
-  }
-  // Get all files from the google accounts
-  const credentials = foundUser.google_credentials;
-  if (!credentials) {
+  if (files.message === "No google credentials")
     return res.status(400).json({ message: "No google credentials" });
-  }
-  const files = new Array();
-  for (const googleCred of credentials) {
-    const folderFiles = await listFilesFolder(googleCred.tokens, "root");
-    folderFiles.map((file) => files.push(file));
-  }
-  res.json({ message: "Files from home", files: files });
+  return res.json(files);
 });
-
 
 /**
  * @desc Upload a file to a folder
@@ -66,38 +55,6 @@ const uploadFile = asyncHandler(async (req, res) => {
 // @route DELETE /files
 // @access Private
 const deleteFile = asyncHandler(async (req, res) => {});
-
-// @desc Get all files from a folder
-// @route GET /files/folders/:folderId
-// @access Private
-const getFolderFiles = asyncHandler(async (req, res) => {
-  console.log("Get folder files");
-  const folderId = req.params.folderId;
-  const username = req.username;
-  const email = req.email;
-  // Find user in MongoDB
-  const foundUser = await User.findOne({
-    username: username,
-    email: email,
-  })
-    .lean()
-    .exec();
-  if (!foundUser) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  // Get the google credentials
-  const credentials = foundUser.google_credentials;
-  if (!credentials) {
-    return res.status(400).json({ message: "No google credentials" });
-  }
-  // Get all files from the google accounts
-  const files = new Array();
-  for (const googleCred of credentials) {
-    const folderFiles = await listFilesFolder(googleCred.tokens, folderId);
-    folderFiles.map((file) => files.push(file));
-  }
-  res.json({ message: `Files from folder: ${folderId}`, files: files });
-});
 
 // @desc Get file by id
 // @route GET /files/:fileId or /files/folders/:folderId/:fileId
@@ -144,9 +101,8 @@ const getFile = asyncHandler(async (req, res) => {
 });
 
 module.exports = {
-  getAllFiles,
+  listFolderFiles,
   uploadFile,
   deleteFile,
-  getFolderFiles,
   getFile,
 };

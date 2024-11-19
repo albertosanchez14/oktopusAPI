@@ -36,6 +36,12 @@ async function listFilesFolder(tokens, folderId) {
   }
 }
 
+/**
+ * Gets a file datastream by its ID.
+ * @param googleTokens Client tokens.
+ * @param fileId The file ID to retrieve.
+ * @returns { Stream } The file datastream.
+ */
 async function getFilebyId(tokens, fileId) {
   // Create an OAuth2 client
   const oauth2Client = new google.auth.OAuth2(

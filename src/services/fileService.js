@@ -1,6 +1,10 @@
 const fs = require("fs");
 
-const { listFilesFolder, uploadFiletoDrive } = require("./driveService");
+const {
+  listFilesFolder,
+  uploadFiletoDrive,
+  getFilebyId,
+} = require("./driveService");
 
 const User = require("../models/User");
 
@@ -78,4 +82,52 @@ async function handleUpload(username, email, files, folderId) {
   return { message: "Files uploaded", files: googleFiles };
 }
 
-module.exports = { handleUpload, handleListFolderFiles };
+/**
+ * Handles the download of a file from the user's google drive accounts.
+ * @param {String} username The username of the user.
+ * @param {String} email The email of the user.
+ * @param {String} fileId The file ID to download.
+ * @param {Array} owners_email The email of the file owners.
+ * @returns { message, data } An object containing a message and the file data.
+ * @throws { Error } If the user is unauthorized, has no google credentials, or
+ * if the file download fails.
+ */
+async function handleDownload(username, email, fileId, owners_email) {
+  // Find user in database
+  const foundUser = await User.findOne({
+    username: username,
+    email: email,
+  })
+    .lean()
+    .exec();
+  if (!foundUser) return { message: "Unauthorized" };
+  // From the file owners email, find the google credentials that match
+  const results = await Promise.all(
+    owners_email.map(async (ownerEmail) => {
+      const googleCred = foundUser.google_credentials.find(
+        (cred) => cred.email === ownerEmail
+      );
+      if (googleCred) {
+        const data = await getFilebyId(googleCred.tokens, fileId);
+        // Save the file locally for testing (can be removed later)
+        const dest = fs.createWriteStream(`${fileId}.png`);
+        // TODO: This only for testing purposes, remove later
+        await data
+          .on("end", () => console.log("Done downloading."))
+          .on("error", (err) => {
+            console.error(err);
+            process.exit(1);
+          })
+          .pipe(dest);
+        // Return the result when the file is successfully downloaded
+        return data;
+      }
+    })
+  );
+  // Assume the first valid result
+  if (results[0] === undefined)
+    return { message: "No valid credentials or download failed" };
+  return { message: "File downloaded", data: results[0] };
+}
+
+module.exports = { handleListFolderFiles, handleUpload, handleDownload };

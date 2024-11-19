@@ -1,13 +1,10 @@
 const asyncHandler = require("express-async-handler");
-const fs = require("fs");
 
 const {
   handleListFolderFiles,
   handleUpload,
+  handleDownload,
 } = require("../services/fileService");
-const { listFilesFolder, getFilebyId } = require("../services/driveService");
-
-const User = require("../models/User");
 
 /**
  * @desc Gets all the metadata of the files in the user's homepage drive account
@@ -56,53 +53,30 @@ const uploadFile = asyncHandler(async (req, res) => {
 // @access Private
 const deleteFile = asyncHandler(async (req, res) => {});
 
-// @desc Get file by id
-// @route GET /files/:fileId or /files/folders/:folderId/:fileId
-// @access Private
-const getFile = asyncHandler(async (req, res) => {
-  console.log("Get file");
+/**
+ * @desc Gets a file datastream by its ID
+ * @route GET /files/:fileId or /files/folders/:folderId/:fileId
+ * @access Private
+ */
+const downloadFile = asyncHandler(async (req, res) => {
   const username = req.username;
   const email = req.email;
-  // Find user in MongoDB
-  const foundUser = await User.findOne({
-    username: username,
-    email: email,
-  })
-    .lean()
-    .exec();
-  if (!foundUser) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
   // Get the file from the google account
-  const fileId = req.body.id;
-  if (fileId !== req.params.fileId) {
+  const fileId = req.params.fileId;
+  if (fileId !== req.body.id) {
     return res.status(400).json({ message: "File id mismatch" });
   }
-  const googleEmails = req.body.owners.map((owner) => owner.emailAddress);
-  googleEmails.map(async (email) => {
-    const googleCred = foundUser.google_credentials.find(
-      (cred) => cred.email === email
-    );
-    if (googleCred) {
-      const data = await getFilebyId(googleCred.tokens, fileId);
-      // TODO: Only for testing, remove when done
-      const dest = fs.createWriteStream(`${req.body.name}`);
-      data
-        .on("end", () => console.log("Done."))
-        .on("error", (err) => {
-          console.log(err);
-          return process.exit();
-        })
-        .pipe(dest);
-      //
-      res.json({ message: "File retrieved", data });
-    }
-  });
+  const owners_email = req.body.owners.map((owner) => owner.emailAddress);
+  // Get the file datastream
+  const data = await handleDownload(username, email, fileId, owners_email);
+  if (data.message === "Unauthorized")
+    return res.status(401).json({ message: "Unauthorized" });
+  return res.status(200).json({ message: "File retrieved", data: data });
 });
 
 module.exports = {
   listFolderFiles,
   uploadFile,
+  downloadFile,
   deleteFile,
-  getFile,
 };

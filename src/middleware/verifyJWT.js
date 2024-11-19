@@ -19,4 +19,13 @@ const verifyJWT = (req, res, next) => {
   });
 };
 
-module.exports = verifyJWT;
+const jwtVerifyPromise = (token, secret) => {
+  return new Promise((resolve) => {
+    jwt.verify(token, secret, (err, decoded) => {
+      if (err) return resolve("Forbidden");
+      resolve(decoded);
+    });
+  });
+};
+
+module.exports = { verifyJWT, jwtVerifyPromise };

@@ -1,6 +1,19 @@
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 
 const User = require("../models/User");
+
+async function checkPassword(username, password) {
+  // Find user in MongoDB
+  const foundUser = await User.findOne({ username }).exec();
+  if (!foundUser) {
+    return "User not registered";
+  }
+  // Compare password
+  const match = await bcrypt.compare(password, foundUser.password);
+  if (!match) return "Incorrect password";
+  return foundUser;
+}
 
 /**
  * @desc Create access and refresh tokens
@@ -64,4 +77,4 @@ async function refreshAccessToken(refreshToken) {
   });
 }
 
-module.exports = { createTokens, refreshAccessToken };
+module.exports = { createTokens, refreshAccessToken, checkPassword };

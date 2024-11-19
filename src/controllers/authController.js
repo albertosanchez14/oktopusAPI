@@ -1,11 +1,15 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const asyncHandler = require("express-async-handler");
 
-const User = require("../models/User");
-const { createTokens, refreshAccessToken } = require("../services/authService");
-
-const { google } = require("googleapis");
+const {
+  createTokens,
+  refreshAccessToken,
+  checkPassword,
+} = require("../services/authService");
+const {
+  genGoogleAuthUrl,
+  getGoogleUser,
+  saveGoogleCredentials,
+} = require("../services/googleAuthService");
 
 /**
  * @desc Login
@@ -19,14 +23,12 @@ const login = asyncHandler(async (req, res) => {
   if (!username || !password) {
     return res.status(400).json({ message: "All fields are required" });
   }
-  // Find user in MongoDB
-  const foundUser = await User.findOne({ username }).exec();
-  if (!foundUser) {
-    return res.status(401).json({ message: "Unauthorized" });
-  }
-  // Compare password
-  const match = await bcrypt.compare(password, foundUser.password);
-  if (!match) return res.status(401).json({ message: "Incorrect password" });
+  // Check password
+  const foundUser = await checkPassword(username, password);
+  if (foundUser === "User not registered")
+    return res.status(404).json({ message: foundUser });
+  if (foundUser === "Incorrect password")
+    return res.status(401).json({ message: foundUser });
   // Create tokens
   const { accessToken, refreshToken } = await createTokens(foundUser);
   // Create secure cookie with refresh token
@@ -53,12 +55,10 @@ const refresh = asyncHandler(async (req, res) => {
   // Get new access token
   const accessToken = await refreshAccessToken(refreshToken);
   // Check if token is valid
-  if (accessToken === "Forbidden") {
+  if (accessToken === "Forbidden")
     return res.status(403).json({ message: "Forbidden" });
-  }
-  if (accessToken === "Unauthorized") {
+  if (accessToken === "Unauthorized")
     return res.status(401).json({ message: "Unauthorized" });
-  }
   // Send new access token
   res.json({ accessToken });
 });
@@ -75,87 +75,42 @@ const logout = (req, res) => {
   res.json({ message: "Cookie cleared" });
 };
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.CLIENT_ID,
-  process.env.CLIENT_SECRET,
-  process.env.REDIRECT_URI
-);
-// @desc Google OAuth login
-// @route GET /auth/google
-// @access Public
+/**
+ * @desc Google OAuth login
+ * @route GET /auth/google
+ * @access Private
+ */
 const googleLogin = asyncHandler(async (req, res) => {
   // Generate URL for Google OAuth
-  const url = oauth2Client.generateAuthUrl({
-    access_type: "offline",
-    scope: [
-      "https://www.googleapis.com/auth/userinfo.profile",
-      "https://www.googleapis.com/auth/userinfo.email",
-      "https://www.googleapis.com/auth/drive",
-    ],
-  });
+  const url = await genGoogleAuthUrl();
   res.redirect(url);
 });
 
-// @desc Google OAuth redirect
-// @route GET /auth/google/redirect
-// @access Public
+/**
+ * @desc Google OAuth redirect
+ * @route GET /auth/google/redirect
+ * @access Private
+ */
 const googleRedirect = asyncHandler(async (req, res) => {
-  // Get code from query
-  const { code } = req.query;
-  // Get tokens from code
-  const { tokens } = await oauth2Client.getToken(code);
-  // Set credentials
-  oauth2Client.setCredentials(tokens);
-  // Get user info
-  // TODO: change to v3 in final implementation
-  const oauth2 = google.oauth2({ version: "v2", auth: oauth2Client });
-  const userInfo = await oauth2.userinfo.get();
-
   // Get refresh token from cookie
   const cookies = req.cookies;
   if (!cookies?.jwt) return res.status(401).json({ message: "Unauthorized" });
   const refreshToken = cookies.jwt;
-  // Verify refresh token
-  jwt.verify(
-    refreshToken,
-    process.env.REFRESH_TOKEN_SECRET,
-    asyncHandler(async (err, decoded) => {
-      // If invalid, return 403 Forbidden
-      if (err) return res.status(403).json({ message: "Forbidden" });
-      // Find user in MongoDB
-      const foundUser = await User.findOne({
-        username: decoded.username,
-      }).exec();
-      if (!foundUser) return res.status(401).json({ message: "Unauthorized" });
-      // Save tokens to user
-      const savedTokens = {
-        username: userInfo.data.name,
-        email: userInfo.data.email,
-        tokens,
-      };
-      try {
-        // Check if account is already linked
-        const tokenExists = foundUser.google_credentials.find(
-          (google) => google.email === savedTokens.email
-        );
-        if (tokenExists) {
-          // Update tokens
-          const index = foundUser.google_credentials.indexOf(tokenExists);
-          foundUser.google_credentials[index] = savedTokens;
-          await foundUser.save();
-          res.redirect("http://localhost:5173/login");
-        } else {
-          // Save tokens
-          foundUser.google_credentials.push(savedTokens);
-          await foundUser.save();
-          res.redirect("http://localhost:5173/login");
-        }
-      } catch (error) {
-        console.error(error);
-        return res.status(400).json({ message: "Error saving tokens" });
-      }
-    })
-  );
+  // Get code from query
+  const { code } = req.query;
+  // Get google user info and tokens
+  const { data, tokens } = await getGoogleUser(code);
+  // Save google credentials
+  const result = await saveGoogleCredentials(refreshToken, data, tokens);
+  // If user doesn't exist, forbidden
+  if (result === "Forbidden") return res.status(403).json({ message: result });
+  if (result === "Unauthorized")
+    return res.status(401).json({ message: result });
+  if (result === "Error saving tokens")
+    return res.status(400).json({ message: result });
+  console.log(result);
+  // Redirect to login page
+  res.redirect(result);
 });
 
 module.exports = {

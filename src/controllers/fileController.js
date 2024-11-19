@@ -1,10 +1,13 @@
-const User = require("../models/User");
 const asyncHandler = require("express-async-handler");
 const fs = require("fs");
-const multer = require("multer");
-const crypto = require("crypto");
 
-const { listFilesFolder, getFilebyId, uploadFiletoDrive } = require("./drive");
+const { handleUpload } = require("../services/fileService");
+const {
+  listFilesFolder,
+  getFilebyId,
+} = require("../services/driveService");
+
+const User = require("../models/User");
 
 // @desc Get all files
 // @route GET /files
@@ -35,71 +38,28 @@ const getAllFiles = asyncHandler(async (req, res) => {
   res.json({ message: "Files from home", files: files });
 });
 
-// Set storage engine
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "uploads/");
-  },
-  filename: function (req, file, cb) {
-    cb(null, `file-${crypto.randomUUID()}.png`);
-  },
-});
-const upload = multer({
-  storage: storage,
-  limits: { fileSize: 10000000 }, //10MB
-});
 
-// @desc Upload new file
-// @route POST /files or /folders/:folderId/:fileId
-// @access Private
+/**
+ * @desc Upload a file to a folder
+ * @route POST /files/folders/:folderId
+ * @access Private
+ */
 const uploadFile = asyncHandler(async (req, res) => {
-  upload.any()(req, res, async function (err) {
-    if (err) {
-      return res.status(400).json({ message: "Error uploading file" });
-    }
-    const folderId = req.params.folderId;
-    const username = req.username;
-    const email = req.email;
-    // Find user in MongoDB
-    const foundUser = await User.findOne({
-      username: username,
-      email: email,
-    })
-      .lean()
-      .exec();
-    if (!foundUser) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-    // Get the google credentials
-    const credentials = foundUser.google_credentials;
-    if (!credentials) {
-      return res.status(400).json({ message: "No google credentials" });
-    }
-    // Upload the file to the google accounts with space
-    let index = 0;
-    const googleFiles = [];
-    while (index < credentials.length) {
-      const googleCred = credentials[index];
-      const files = req.files;
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i];
-        const data = await uploadFiletoDrive(googleCred.tokens, file, folderId);
-        if (data === undefined) {
-          // Error when uploading, trying next account
-          index++;
-          break;
-        } else {
-          // File uploaded successfully
-          googleFiles.push(data);
-          fs.unlinkSync(file.path); // Delete the uploaded file
-          files.splice(i, 1); // Remove the uploaded file from the array
-          i--; // Adjust index after removing the item
-        }
-      }
-      index = files.length === 0 ? credentials.length : 0;
-    }
-    res.json({ message: "Files uploaded", files: googleFiles });
-  });
+  const folderId = req.params.folderId;
+  const username = req.username;
+  const email = req.email;
+  const files = req.files;
+  if (!files || files.length === 0)
+    return res.status(400).json({ message: "No files uploaded" });
+  try {
+    const result = await handleUpload(username, email, files, folderId);
+    if (result.message !== "Files uploaded")
+      return res.status(400).json({ message: result.message });
+    return res.status(200).json(result);
+  } catch (err) {
+    console.error("Error uploading file:", err);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
 });
 
 // @desc Delete a file

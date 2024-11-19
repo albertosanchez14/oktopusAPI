@@ -59,6 +59,15 @@ async function getFilebyId(tokens, fileId) {
   }
 }
 
+/**
+ * Uploads a file to the user's homepage Google Drive.
+ * @param googleTokens Client tokens.
+ * @param file The file to upload.
+ * @param folderId The folder ID to upload the file to.
+ * @returns { id, name } || undefined The metadata of the uploaded
+ * file.
+ * @throws { Error } If the file cannot be uploaded.
+ */
 async function uploadFiletoDrive(tokens, file, folderId) {
   // Create an OAuth2 client
   const oauth2Client = new google.auth.OAuth2(

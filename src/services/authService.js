@@ -3,6 +3,13 @@ const bcrypt = require("bcrypt");
 
 const User = require("../models/User");
 
+/**
+ * @desc Check password
+ * @param {String} username
+ * @param {String} password
+ * @returns {String} message - User not registered, Incorrect password
+ * @returns {Object} foundUser
+ */
 async function checkPassword(username, password) {
   // Find user in MongoDB
   const foundUser = await User.findOne({ username }).exec();

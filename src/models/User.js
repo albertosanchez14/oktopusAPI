@@ -35,7 +35,6 @@ const tokenSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true,
   },
   tokens: {
     type: googleTokenSchema,
@@ -60,8 +59,7 @@ const userSchema = new mongoose.Schema({
     required: true,
   },
   google_credentials: {
-    type: [tokenSchema],
-    required: false,
+    type: [tokenSchema]
   },
 });
 

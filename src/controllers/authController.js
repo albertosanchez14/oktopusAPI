@@ -108,7 +108,6 @@ const googleRedirect = asyncHandler(async (req, res) => {
     return res.status(401).json({ message: result });
   if (result === "Error saving tokens")
     return res.status(400).json({ message: result });
-  console.log(result);
   // Redirect to login page
   res.redirect(result);
 });
